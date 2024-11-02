@@ -31,3 +31,15 @@ variable "instance_name" {
   default     = "Provisioned by Terraform"
 }
 
+variable "node_env" {
+  description = "Node.js environment"
+  type        = string
+  default     = "production"
+}
+
+variable "app_port" {
+  description = "Application port"
+  type        = number
+  default     = 3000
+}
+

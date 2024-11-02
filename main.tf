@@ -20,6 +20,7 @@ resource "aws_subnet" "public" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = "us-east-1a"
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "public-subnet"
@@ -91,19 +92,54 @@ resource "aws_security_group" "fashion_assistant" {
 
 # Create EC2 Instance
 resource "aws_instance" "fashion_assistant" {
-  ami           = "ami-0c7217cdde317cfec"  # Updated to latest Amazon Linux 2023 AMI for us-east-1
+  ami           = "ami-0c7217cdde317cfec"
   instance_type = "t2.micro"
   subnet_id     = aws_subnet.public.id
+  key_name      = aws_key_pair.deployer.key_name
 
   vpc_security_group_ids = [aws_security_group.fashion_assistant.id]
-  
   associate_public_ip_address = true
+
+  user_data = <<-EOF
+              #!/bin/bash
+              # Update system packages
+              apt-get update
+              apt-get upgrade -y
+              
+              # Install Node.js 18
+              curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+              apt-get install -y nodejs
+
+              # Install Git
+              apt-get install -y git
+
+              # Create app directory with correct permissions
+              mkdir -p /home/ubuntu/fashion-assistant
+              chown -R ubuntu:ubuntu /home/ubuntu/fashion-assistant
+              chmod 755 /home/ubuntu/fashion-assistant
+
+              # Install PM2 globally
+              npm install -g pm2
+              
+              # Set environment variables
+              echo "export NODE_ENV=production" >> /home/ubuntu/.bashrc
+              echo "export PORT=3000" >> /home/ubuntu/.bashrc
+              
+              # Ensure ubuntu user owns their home directory
+              chown -R ubuntu:ubuntu /home/ubuntu/
+              EOF
 
   tags = {
     Name        = "fashion-assistant-backend"
     Environment = "development"
     Application = "nodejs"
   }
+}
+
+# Create a key pair for SSH access
+resource "aws_key_pair" "deployer" {
+  key_name   = "fashion-assistant-key"
+  public_key = file(pathexpand("~/.ssh/fashion-assistant.pub"))
 }
 
 # Output the public IP
